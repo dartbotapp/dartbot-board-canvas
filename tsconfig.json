@@ -15,7 +15,9 @@
     "inlineSources": true,
     "rootDir": "./",
     "declaration": true,
-    "incremental": true
+    "incremental": true,
+    "skipLibCheck": true
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts"],
+  "types" : ["mocha"]
 }

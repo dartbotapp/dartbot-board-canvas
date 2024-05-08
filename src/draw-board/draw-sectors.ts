@@ -1,46 +1,68 @@
-import { Board, getSectorWidth } from './board';
-import { BoardParams } from './board-params';
+import { Theme, Token } from '../lib';
+import { Board, getSectorWidth } from '../lib/board';
+
+const PI2 = Math.PI * 2;
 
 export const drawSectors = (
-  context: CanvasRenderingContext2D,
   board: Board,
-  params: BoardParams
+  theme: Theme,
+  context: CanvasRenderingContext2D
 ) => {
-  const { sectors } = board;
+  context.fillStyle = theme.boardBackground;
+  context.beginPath();
+  context.arc(0, 0, board.radius, 0, PI2, false);
+  context.fill();
+  const { sectors, rings } = board;
+  const colors = theme.sectorColor;
+
+  // Draw the sectors
   for (let s = 0; s < sectors.length; s += 1) {
-    drawSector(context, board, params, s);
+    for (let r = rings.length - 1; r >= 2; r -= 1) {
+      const c1 = r % colors.length;
+      const c2 = s % colors[c1].length;
+      drawSector(board, colors[c1][c2], s, r, context);
+    }
   }
+
+  // Draw the bullseye
+  const bullColors = theme.sectorColor[1];
+  const c1 = 1 % bullColors.length;
+  const c2 = 0 % bullColors.length;
+  context.fillStyle = bullColors[c1];
+  context.beginPath();
+  context.moveTo(0, 0);
+  context.arc(0, 0, board.rings[1], 0, PI2);
+  context.fill();
+  context.beginPath();
+  context.moveTo(0, 0);
+  context.fillStyle = bullColors[c2];
+  context.arc(0, 0, board.rings[0], 0, PI2);
+  context.fill();
 };
 
-export const drawSector = (
-  context: CanvasRenderingContext2D,
+/**
+ * Draw an individual sector or the board.
+ * A sector is a slice of the board between two wires
+ * and two rings.
+ * @param board Board dimensions
+ * @param color Color of the sector background
+ * @param s Sector index
+ * @param r Ring index
+ * @param context Canvas context to draw the sector to
+ */
+const drawSector = (
   board: Board,
-  params: BoardParams,
-  s: number
-) => {
-  const { rings } = board;
-  for (let r = rings.length - 1; r >= 2; r -= 1) {
-    drawSection(context, board, params, s, r);
-  }
-};
-
-export const drawSection = (
-  context: CanvasRenderingContext2D,
-  board: Board,
-  params: BoardParams,
+  color: string,
   s: number,
-  r: number
+  r: number,
+  context: CanvasRenderingContext2D,
 ) => {
   const sectorWidth = getSectorWidth(board);
-  const { colors } = params;
-  const c1 = r % colors.length;
-  const c2 = s % colors[c1].length;
   context.moveTo(0, 0);
   const overhang = r === board.rings.length - 1 ? 0 : 0.5;
   const ring = board.rings[r] + overhang;
   const ringPrev = r === 0 ? 0 : board.rings[r - 1];
   const strokewidth = ring - ringPrev;
-  // const PI = Math.PI;
   context.lineWidth = strokewidth;
   context.lineCap = 'butt';
   context.beginPath();
@@ -49,6 +71,6 @@ export const drawSection = (
   const end = sectorWidth * (s + 1) + angleOverhang;
   const radius = ring - (ring - ringPrev) / 2;
   context.arc(0, 0, radius, start, end, false);
-  context.strokeStyle = colors[c1][c2];
+  context.strokeStyle = color;
   context.stroke();
 };

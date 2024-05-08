@@ -1,37 +1,58 @@
-import { getRandomPoint, getSectorWidth } from './draw-board/board';
-import { getBoardParams } from './draw-board/board-params';
 import { clearBoard } from './draw-board/clear-board';
-import { createBoard } from './draw-board/create-board';
+import { createBoard } from './lib/create-board';
 import { drawBoard } from './draw-board/draw-board';
 import { drawHits } from './draw-board/draw-hits';
-import { PolarPoint } from './draw-board/polar-point';
+import { getPolar, Point, PolarPoint } from './lib/polar-point';
 import { setContext } from './draw-board/set-context';
+import { debounce } from './lib/debounce';
+import { Board, translateCoords } from './lib';
+import { themeBuilder } from './lib/theme-builder';
+
+const RESIZE_DEBOUNCE_MS = 100;
+const DEFAULT_ZOOM = 0;
 
 export class DartbotBoardCanvas extends HTMLElement {
-  private observer!: MutationObserver;
-  private resizeObserver!: ResizeObserver;
-  private template: HTMLTemplateElement;
-  private shadow: ShadowRoot;
+  #resizeObserver: ResizeObserver;
+  #canvas!: HTMLCanvasElement;
+  #hits: PolarPoint[] = [];
+  #zoom = DEFAULT_ZOOM;
+  #template: HTMLTemplateElement;
+  #shadow: ShadowRoot;
+  #board: Board;
 
-  private hits: PolarPoint[] = [];
-  protected board: any;
-  static get observedAttributes() {
-    return ['prefix-text'];
+  get zoom(): number {
+    return this.#zoom;
   }
+
+  set zoom(value: number) {
+    this.#zoom = value;
+    this.#render();
+  }
+
+  get hits(): PolarPoint[] {
+    return this.#hits;
+  }
+
+  set hits(value: PolarPoint[]) {
+    this.#hits = value;
+    this.#render();
+  }
+
   constructor() {
     super();
-
-    this.board = createBoard();
-    this.hits = [...Array(20).keys()].map(k => getRandomPoint(this.board, 1, 4));
-
-    this.shadow = this.attachShadow({mode: 'open'});
-    this.template = document.createElement('template');
-    this.template.innerHTML = `
+    this.#board = createBoard();
+    this.#resizeObserver = new ResizeObserver(
+      debounce(this.#resize.bind(this), RESIZE_DEBOUNCE_MS)
+    );
+    this.#shadow = this.attachShadow({ mode: 'open' });
+    this.#template = document.createElement('template');
+    this.#template.innerHTML = `
       <style>
       :host {
+        --size: 800px;
         display: block;
-        width: 300px;
-        height: 300px;
+        width: var(--size);
+        height: var(--size);
         box-sizing: border-box;
       }
       canvas { position: absolute; }
@@ -39,89 +60,77 @@ export class DartbotBoardCanvas extends HTMLElement {
       <canvas></canvas>
     `;
   }
+
   connectedCallback() {
-    this.observer = new MutationObserver(mutations => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'attributes') {
-          console.log(`mutate
-            ${mutation.attributeName}
-            ${mutation.oldValue}
-          `);
-        }
-      }
-    });
-    this.observer.observe(this, {attributes: true});
+    this.#resizeObserver.observe(this, { box: 'device-pixel-content-box' });
+    const content = this.#template.content.cloneNode(true);
+    this.#shadow.appendChild(content);
+    this.#canvas = this.#shadow.querySelector('canvas')!;
+  }
 
-    function debounce(func: any, wait: any) {
-      let timeout: NodeJS.Timeout;
-      return function (...args: any[]) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), wait);
-      };
-    }
-
-    const debouncedResize = debounce((entries: ResizeObserverEntry[]) => {
-      for (const entry of entries) {
-        const cr = entry.contentRect;
-        canvas.width = cr.width!;
-        canvas.height = cr.height!;
-      }
-      this._render();
-    }, 100);
-
-    this.resizeObserver = new ResizeObserver(entries => {
-      debouncedResize(entries);
-      for (const entry of entries) {
-        const cr = entry.contentRect;
-      }
-    });
-    this.resizeObserver.observe(this);
-
-    const content = this.template.content.cloneNode(true);
-    this.shadow.appendChild(content);
-    const canvas = this.shadow.querySelector('canvas')!;
-    canvas.width = this.clientWidth!;
-    canvas.height = this.clientHeight!;
-    this._render();
+  renderCallback() {
+    this.#render();
   }
 
   disconnectedCallback() {
-    const child = this.querySelector('svg');
-    if (child) {
-      this.removeChild(child);
+    this.#resizeObserver.disconnect();
+  }
+
+  #resize(entries: ResizeObserverEntry[]) {
+    console.log(`resize ${JSON.stringify(entries[0])}`);
+    for (const entry of entries) {
+      const dw = entry.devicePixelContentBoxSize[0].inlineSize;
+      const dh = entry.devicePixelContentBoxSize[0].blockSize;
+      const cr = entry.contentRect;
+      this.#canvas.width = dw;
+      this.#canvas.height = dh;
+      this.#canvas.style.width = `${cr.width}px`;
+      this.#canvas.style.height = `${cr.height}px`;
     }
-    this.observer.disconnect();
-    this.resizeObserver.disconnect();
+    this.#render();
   }
 
-  attributeChangedCallback(name: string, oldValue: string, newValue: string) {
-    console.log(`attribute changed ${name} ${newValue}`);
-  }
-
-  _render() {
-    const canvas = this.shadow.querySelector('canvas');
+  #render() {
+    const canvas = this.#shadow.querySelector('canvas')!;
     if (canvas == null) {
       return;
     }
-
     const ctx = canvas.getContext('2d');
     if (ctx == null) {
       return;
     }
+    const board = this.#board;
+    const style = getComputedStyle(this);
+    const theme = themeBuilder(style);
 
-    const params = getBoardParams();
-    clearBoard(ctx);
     ctx.save();
-    setContext({
-      radius: this.board.radius,
-      sectors: this.board.sectors.length,
-      zoom: params.zoom,
-      centerPoint: params.centerPoint
-    }, ctx);
-    drawBoard(ctx, params, this.board);
-
-    drawHits(params, ctx, this.hits);
-
+    clearBoard(ctx);
+    setContext(board, ctx);
+    drawBoard(board, theme, ctx);
+    drawHits(theme,ctx, this.#hits);
     ctx.restore();
   }
+
+  /**
+   * Translates a point from the canvas to match
+   * dimensions of the board. The point is adjusted
+   * so that 0,0 is the center of the board and dimensions
+   * are in mm relative to the board radius.
+   */
+  translatePoint(x: number, y: number): PointInfo {
+    const { offsetWidth, offsetHeight } = this.#canvas;
+    const sectors = this.#board.sectors.length;
+    const radius = this.#board.radius;
+    const point = translateCoords(offsetWidth, offsetHeight, this.#zoom, radius, sectors, x, y);
+    const polar = getPolar(point.x, point.y);
+    return { point, polar, x, y };
+  }
+
+}
+
+export interface PointInfo {
+  x: number;
+  y: number;
+  point: Point;
+  polar: PolarPoint;
 }

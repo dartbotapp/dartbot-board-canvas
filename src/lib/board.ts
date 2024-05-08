@@ -83,3 +83,9 @@ export const getSectorIndexFromPoint = (
   const i = sectorIndex % sectorLength;
   return i;
 };
+
+export const getRingIndexFromPoint = (board: Board, p: PolarPoint): number | undefined => {
+  const { rings } = board;
+  const ringIndex = rings.findIndex(r => p.radius <= r);
+  return ringIndex >= 0 ? ringIndex : undefined;
+};

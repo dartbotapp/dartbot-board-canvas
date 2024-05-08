@@ -74,3 +74,15 @@ npm start
 ```
 
 To run a local development server that serves the basic demo located in `demo/index.html`
+
+## Goals
+* HTML component that renders an interactive dartboard
+* Render using HTMLCanvas
+* Exported as a vanilla web component with not dependencies, libraries, or frameworks
+* Control styling via css as much as possible
+* Implement accessibility recommendations
+* Typescript
+* Attributes, input props, events, mutation observer
+* Auto resizing
+* Touch input
+* Interactivity (hover, select, highlight, click)

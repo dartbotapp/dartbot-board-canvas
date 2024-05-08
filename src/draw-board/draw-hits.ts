@@ -1,17 +1,17 @@
-import { BoardParams } from './board-params';
-import { PolarPoint, getCartesian } from './polar-point';
+import { Theme } from '../lib';
+import { PolarPoint, getPoint } from '../lib/polar-point';
 
 export const drawHits = (
-  params: BoardParams,
+  theme: Theme,
   context: CanvasRenderingContext2D,
   hits: PolarPoint[]
 ) => {
-  context.fillStyle = params.hitFillColor;
-  context.strokeStyle = params.hitLineColor;
-  context.lineWidth = params.hitLineWidth;
-  const radius = params.hitRadius;
+  context.fillStyle = theme.hitFillColor;
+  context.strokeStyle = theme.hitStokeColor;
+  context.lineWidth = theme.hitStrokeWidth;
+  const radius = theme.hitRadius;
   for (const hit of hits) {
-    const point = getCartesian(hit);
+    const point = getPoint(hit);
     context.beginPath();
     context.arc(point.x, point.y, radius, 0, 2 * Math.PI, false);
     context.fill();
